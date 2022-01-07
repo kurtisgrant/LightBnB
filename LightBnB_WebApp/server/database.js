@@ -116,16 +116,9 @@ const getAllProperties = function(options, limit = 10) {
   ORDER BY properties.cost_per_night
   LIMIT $5;
   `;
+  const values = [qOptions.city, qOptions.min_price * 100, qOptions.max_price * 100, qOptions.min_rating, limit];
 
-  return pool.query(
-    queryStr,
-    [
-      qOptions.city,
-      qOptions.min_price * 100,
-      qOptions.max_price * 100,
-      qOptions.min_rating, limit
-    ]
-  )
+  return pool.query(queryStr, values)
     .then(res => res.rows)
     .catch(err => console.log(err.message));
 };
