@@ -93,6 +93,7 @@ const getAllProperties = function(options, limit = 10) {
   // Modify option values to suit query needs
   const qOptions = {
     city: '%',
+    user_id: options.user_id,
     min_price: options.minimum_price_per_night || 0,
     max_price: options.maximum_price_per_night || 1000000,
     min_rating: options.minimum_rating || 0
