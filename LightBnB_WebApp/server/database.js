@@ -92,11 +92,11 @@ const getAllProperties = function(options, limit = 10) {
     options.city = '%';
   }
   options.minimum_price_per_night = options.minimum_price_per_night || 0;
-  options.maximum_price_per_night = options.maximum_price_per_night || 100000000;
+  options.maximum_price_per_night = options.maximum_price_per_night || 1000000;
   options.minimum_rating = options.minimum_rating || 0;
 
   const queryStr = `
-  SELECT properties.*, avg(property_reviews.rating) 
+  SELECT properties.*, avg(property_reviews.rating) as average_rating
   FROM properties
   JOIN property_reviews on property_reviews.property_id = properties.id
   WHERE city LIKE $1
@@ -111,7 +111,7 @@ const getAllProperties = function(options, limit = 10) {
 
   return pool.query(
     queryStr,
-    [options.city, options.minimum_price_per_night * 10, options.maximum_price_per_night * 10, options.minimum_rating, limit]
+    [options.city, options.minimum_price_per_night * 100, options.maximum_price_per_night * 100, options.minimum_rating, limit]
   )
     .then(res => res.rows)
     .catch(err => console.log(err.message));
