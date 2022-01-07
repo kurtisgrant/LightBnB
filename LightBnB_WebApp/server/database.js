@@ -64,7 +64,6 @@ exports.addUser = addUser;
  * @return {Promise<[{}]>} A promise to the reservations.
  */
 const getAllReservations = function(guest_id, limit = 10) {
-  console.log('getting res for id: ', guest_id);
   return pool.query(`
   SELECT * FROM reservations 
   JOIN properties on reservations.property_id = properties.id
@@ -74,7 +73,6 @@ const getAllReservations = function(guest_id, limit = 10) {
     .then(res => res.rows)
     .catch(err => console.log(err.message));
 };
-getAllReservations(3, 10).then(res => console.log(res));
 exports.getAllReservations = getAllReservations;
 
 /// Properties
@@ -93,27 +91,29 @@ const getAllProperties = function(options, limit = 10) {
   } else {
     options.city = '%';
   }
-  if (options.user_id) {
-    options.user_id = `AND user_id = ${options.user_id}` || ``;
-  }
   options.minimum_price_per_night = options.minimum_price_per_night || 0;
   options.maximum_price_per_night = options.maximum_price_per_night || 100000000;
   options.minimum_rating = options.minimum_rating || 0;
 
-  return pool.query(`
+  const queryStr = `
   SELECT properties.*, avg(property_reviews.rating) 
   FROM properties
   JOIN property_reviews on property_reviews.property_id = properties.id
   WHERE city LIKE $1
   AND cost_per_night > $2
   AND cost_per_night < $3
-  $4
+  ${options.user_id ? `AND user_id = ${options.user_id}` : ''}
   GROUP BY properties.id
-  HAVING avg(property_reviews.rating) > $5
+  HAVING avg(property_reviews.rating) > $4
   ORDER BY properties.cost_per_night
-  LIMIT $6;
-  `, [options.city, options.minimum_price_per_night * 10, options.maximum_price_per_night * 10, options.user_id, options.minimum_rating, limit])
-    .then(res => console.log('res: ', res.rows.map(r => r.title)))
+  LIMIT $5;
+  `;
+
+  return pool.query(
+    queryStr,
+    [options.city, options.minimum_price_per_night * 10, options.maximum_price_per_night * 10, options.minimum_rating, limit]
+  )
+    .then(res => res.rows)
     .catch(err => console.log(err.message));
 };
 exports.getAllProperties = getAllProperties;
@@ -125,9 +125,23 @@ exports.getAllProperties = getAllProperties;
  * @return {Promise<{}>} A promise to the property.
  */
 const addProperty = function(property) {
-  const propertyId = Object.keys(properties).length + 1;
-  property.id = propertyId;
-  properties[propertyId] = property;
-  return Promise.resolve(property);
+  let colsStr = '';
+  let valsStr = '';
+  let valsArr = [];
+  let ind = 0;
+  for (const [key, value] of Object.entries(property)) {
+    ind++;
+    colsStr = colsStr.length ? `${colsStr}, ${key}` : key;
+    valsStr = valsStr.length ? `${valsStr}, $${ind}` : `$${ind}`;
+    valsArr.push(value);
+  }
+
+  const queryString = `
+  INSERT INTO properties (${colsStr}) VALUES (${valsStr}) RETURNING *;
+  `;
+
+  return pool.query(queryString, valsArr)
+    .then(res => console.log(res.rows))
+    .catch(err => console.log(err.message));
 };
 exports.addProperty = addProperty;
