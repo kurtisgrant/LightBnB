@@ -89,16 +89,19 @@ exports.getAllReservations = getAllReservations;
  * @return {Promise<[{}]>}  A promise to the properties.
  */
 const getAllProperties = function(options, limit = 10) {
-  if (options.city && options.city.length > 3) {
-    options.city = `%${options.city.slice(1, -1)}%`;
-  } else if (options.city && options.city.length > 0) {
-    options.city = `%${options.city}%`;
-  } else {
-    options.city = '%';
+
+  // Modify option values to suit query needs
+  const qOptions = {
+    city: '%',
+    min_price: options.minimum_price_per_night || 0,
+    max_price: options.maximum_price_per_night || 1000000,
+    min_rating: options.minimum_rating || 0
+  };
+  if (options.city) {
+    qOptions.city = options.city.length > 3 ?
+      `%${options.city.slice(1, -1)}%` :
+      `%${options.city}%`;
   }
-  options.minimum_price_per_night = options.minimum_price_per_night || 0;
-  options.maximum_price_per_night = options.maximum_price_per_night || 1000000;
-  options.minimum_rating = options.minimum_rating || 0;
 
   const queryStr = `
   SELECT properties.*, avg(property_reviews.rating) as average_rating
@@ -106,8 +109,8 @@ const getAllProperties = function(options, limit = 10) {
   JOIN property_reviews on property_reviews.property_id = properties.id
   WHERE city LIKE $1
   AND cost_per_night > $2
-  AND cost_per_night < $3
-  ${options.user_id ? `AND user_id = ${options.user_id}` : ''}
+  AND cost_per_night < $3 \
+  ${qOptions.user_id ? `\nAND user_id = ${qOptions.user_id}` : ''}
   GROUP BY properties.id
   HAVING avg(property_reviews.rating) > $4
   ORDER BY properties.cost_per_night
@@ -116,7 +119,12 @@ const getAllProperties = function(options, limit = 10) {
 
   return pool.query(
     queryStr,
-    [options.city, options.minimum_price_per_night * 100, options.maximum_price_per_night * 100, options.minimum_rating, limit]
+    [
+      qOptions.city,
+      qOptions.min_price * 100,
+      qOptions.max_price * 100,
+      qOptions.min_rating, limit
+    ]
   )
     .then(res => res.rows)
     .catch(err => console.log(err.message));
@@ -130,23 +138,24 @@ exports.getAllProperties = getAllProperties;
  * @return {Promise<{}>} A promise to the property.
  */
 const addProperty = function(property) {
+
   let colsStr = '';
-  let valsStr = '';
+  let paramsStr = '';
   let valsArr = [];
   let ind = 0;
   for (const [key, value] of Object.entries(property)) {
     ind++;
     colsStr = colsStr.length ? `${colsStr}, ${key}` : key;
-    valsStr = valsStr.length ? `${valsStr}, $${ind}` : `$${ind}`;
+    paramsStr = paramsStr.length ? `${paramsStr}, $${ind}` : `$${ind}`;
     valsArr.push(value);
   }
 
-  const queryString = `
-  INSERT INTO properties (${colsStr}) VALUES (${valsStr}) RETURNING *;
-  `;
+  const queryStr =
+    `INSERT INTO properties (${colsStr}) \
+    VALUES (${paramsStr}) RETURNING *;`;
 
-  return pool.query(queryString, valsArr)
-    .then(res => console.log(res.rows))
+  return pool.query(queryStr, valsArr)
+    .then(res => res.rows)
     .catch(err => console.log(err.message));
 };
 exports.addProperty = addProperty;
